@@ -145,9 +145,6 @@ public class StudentNetworkSimulator extends NetworkSimulator
     protected int calculateCheckSum(String data)
     {
         int hash = data.hashCode();
-        while (hash > 1000) {
-            hash = String.valueOf(hash).hashCode();
-        }
         return hash;
     }
 
