@@ -157,7 +157,7 @@ public class StudentNetworkSimulator extends NetworkSimulator
         return diff;
     }
 
-    // Calculate the checksum of a file
+    // Calculate the checksum of a string
     protected int calculateCheckSum(String data)
     {
         int hash = data.hashCode();
@@ -182,6 +182,7 @@ public class StudentNetworkSimulator extends NetworkSimulator
     // the receiving upper layer.
     protected void aOutput(Message message)
     {
+        // drop new message when buffer is full
         if (SenderBuffer.size() >= SenderBufferSize) {
             if (traceLevel >= 2)
             {
@@ -208,6 +209,7 @@ public class StudentNetworkSimulator extends NetworkSimulator
 
     protected void aSend(Packet p)
     {
+        // restart timer every time a packet is pushed to layer 3
         stopTimer(A);
         toLayer3(A, p);
         startTimer(A, RxmtInterval);
@@ -240,8 +242,17 @@ public class StudentNetworkSimulator extends NetworkSimulator
                 SenderBuffer.remove(0);
             }
 
-            // send new packets
-            for (int i = 0; i < Math.min(SenderBuffer.size(), diff); i ++) {
+            // get the buffer index of LPS packet
+            int LPSindex = 0;
+            for (int i = 0; i < SenderBuffer.size(); i ++) {
+                if (SenderBuffer.get(i).getSeqnum() == LPS) {
+                    LPSindex = i;
+                    break;
+                }
+            }
+
+            // send new packets starting from LPS+1
+            for (int i = LPSindex + 1; i < Math.min(SenderBuffer.size(), LPSindex + diff + 1); i ++) {
                 aSend(SenderBuffer.get(i));
                 LPS = (LPS + 1) % LimitSeqNo;
             }
