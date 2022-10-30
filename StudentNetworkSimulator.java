@@ -115,6 +115,12 @@ public class StudentNetworkSimulator extends NetworkSimulator
     // Last packet sent
     private int LPS;
 
+    // Sender buffer
+    private ArrayList<Packet> SenderBuffer;
+
+    // Sender buffer size
+    public static final int SenderBufferSize = 50;
+
     // Receiver state variable
     // Receive window size
     private int RWS;
@@ -164,13 +170,23 @@ public class StudentNetworkSimulator extends NetworkSimulator
     // the receiving upper layer.
     protected void aOutput(Message message)
     {
+        if (SenderBuffer.size() >= SenderBufferSize) {
+            if (traceLevel >= 2)
+            {
+                System.out.println("Sender buffer size(" + SenderBufferSize + ") is full. New message from layer 5 is dropped.");
+            }
+            return;
+        }
+
         String payload = message.getData();
-        int seqnum = 0;
         int acknum = AckNumData;
+
+        int lastSeqNum = SenderBuffer.get(SenderBuffer.size()-1).getSeqnum();
+        int seqnum = (lastSeqNum + 1) % LimitSeqNo;
 
         int checksum = calculateCheckSum(seqnum+acknum+payload);
         Packet packet = new Packet(seqnum, acknum, checksum, payload);
-        toLayer3(A, packet);
+        SenderBuffer.add(packet);
     }
     
     // This routine will be called whenever a packet sent from the B-side 
@@ -200,6 +216,7 @@ public class StudentNetworkSimulator extends NetworkSimulator
         SWS = WindowSize;
         LAR = -1;
         LPS = -1;
+        SenderBuffer = new ArrayList<>();
     }
     
     // This routine will be called whenever a packet sent from the B-side 
