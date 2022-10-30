@@ -147,6 +147,16 @@ public class StudentNetworkSimulator extends NetworkSimulator
 	RxmtInterval = delay;
     }
 
+    // Calculate the difference of 2 number module sequence number
+    protected int calculateDiff(int low, int high)
+    {
+        int diff = low - high;
+        if (diff < 0) {
+            diff += LimitSeqNo;
+        }
+        return diff;
+    }
+
     // Calculate the checksum of a file
     protected int calculateCheckSum(String data)
     {
@@ -155,6 +165,8 @@ public class StudentNetworkSimulator extends NetworkSimulator
     }
 
     // check if a given packet has corrupted
+    // return false if the packet is corrupted
+    // otherwise return true
     protected boolean checkCorruption(Packet p)
     {
         int checksum = p.getChecksum();
@@ -187,8 +199,13 @@ public class StudentNetworkSimulator extends NetworkSimulator
         int checksum = calculateCheckSum(seqnum+acknum+payload);
         Packet packet = new Packet(seqnum, acknum, checksum, payload);
         SenderBuffer.add(packet);
+
+        if (calculateDiff(LAR, LPS) < SWS) {
+            toLayer3(A, packet);
+            LPS = (LPS + 1) % LimitSeqNo;
+        }
     }
-    
+
     // This routine will be called whenever a packet sent from the B-side 
     // (i.e. as a result of a toLayer3() being done by a B-side procedure)
     // arrives at the A-side.  "packet" is the (possibly corrupted) packet
