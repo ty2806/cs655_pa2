@@ -201,9 +201,16 @@ public class StudentNetworkSimulator extends NetworkSimulator
         SenderBuffer.add(packet);
 
         if (calculateDiff(LAR, LPS) < SWS) {
-            toLayer3(A, packet);
+            aSend(packet);
             LPS = (LPS + 1) % LimitSeqNo;
         }
+    }
+
+    protected void aSend(Packet p)
+    {
+        stopTimer(A);
+        toLayer3(A, p);
+        startTimer(A, RxmtInterval);
     }
 
     // This routine will be called whenever a packet sent from the B-side 
@@ -212,7 +219,34 @@ public class StudentNetworkSimulator extends NetworkSimulator
     // sent from the B-side.
     protected void aInput(Packet packet)
     {
+        // check if packet is corrupted
+        if (checkCorruption(packet)) {
+            return;
+        }
 
+        int ack = packet.getSeqnum();
+        // duplicate ack
+        if (ack == LAR) {
+            aSend(SenderBuffer.get(0));
+        }
+        // new ack
+        else {
+            int diff = calculateDiff(LAR, ack);
+            // update LAR
+            LAR = ack;
+
+            // remove acknowledged packets in buffer
+            for (int i = 0; i < diff; i ++) {
+                SenderBuffer.remove(0);
+            }
+
+            // send new packets
+            for (int i = 0; i < Math.min(SenderBuffer.size(), diff); i ++) {
+                aSend(SenderBuffer.get(i));
+                LPS = (LPS + 1) % LimitSeqNo;
+            }
+
+        }
     }
     
     // This routine will be called when A's timer expires (thus generating a 
@@ -221,7 +255,7 @@ public class StudentNetworkSimulator extends NetworkSimulator
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt()
     {
-
+        aSend(SenderBuffer.get(0));
     }
     
     // This routine will be called once, before any of your other A-side 
