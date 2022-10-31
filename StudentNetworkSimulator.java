@@ -136,6 +136,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // Receiver buffer
     private Queue<Packet> receiverBuffer;
 
+    private int numOfPacketToLayer5 = 0;
+
+    private int numOfAckSentToB = 0;
+
+    private int numOfCorruptedPackets = 0;
+
+    private int numOfPacketsReceivedByBNotLoss = 0;
+
     // Sender statistic variable
     // number of packets sent
     private int numPacket;
@@ -238,7 +246,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     protected void aInput(Packet packet) {
         // check if packet is corrupted
         System.out.println("ack: " + packet);
-        System.out.println("ack checksum:"+generateChecksum(packet.getSeqnum(), packet.getAcknum(), packet.getPayload()));
+        System.out.println("ack checksum:" + generateChecksum(packet.getSeqnum(), packet.getAcknum(), packet.getPayload()));
         if (!checkCorruption(packet)) {
             return;
         }
@@ -289,8 +297,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // timer interrupt). You'll probably want to use this routine to control 
     // the retransmission of packets. See startTimer() and stopTimer(), above,
     // for how the timer is started and stopped. 
-    protected void aTimerInterrupt()
-    {
+    protected void aTimerInterrupt() {
         aSend(SenderBuffer.get(0));
         numRxm += 1;
     }
@@ -321,12 +328,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // if is NPE, find current cumulative ack, call to layer5() send data update NPE and LPA
     // if out of order, put packet into buffer
     protected void bInput(Packet packet) {
+        numOfPacketsReceivedByBNotLoss++;
         int acknum = packet.getAcknum();
         int seqnum = packet.getSeqnum();
         int checksum = packet.getChecksum();
         String payload = packet.getPayload();
         // if packet corrupted, drop it.
         if (!checkCorruption(packet)) {
+            numOfCorruptedPackets++;
             return;
         }
 
@@ -348,6 +357,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
                 Packet next = receiverBuffer.peek();
                 if (next.getSeqnum() == NPE) {
                     toLayer5(next.getPayload());
+                    numOfPacketToLayer5++;
                     bAcknum = NPE;
                     NPE = updateWindow(NPE, LimitSeqNo);
                     LPA = updateWindow(LPA, LimitSeqNo);
@@ -359,12 +369,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             // I think it doesn't matter?
             Packet ackPacket = new Packet(bAcknum, AckNumAck, generateChecksum(bAcknum, AckNumAck, ""), "");
             toLayer3(B, ackPacket);
+            numOfAckSentToB++;
 
 
         }
         // out of order packet received.
         else {
             receiverBuffer.add(packet);
+            new Packet(NPE - 1, AckNumAck, generateChecksum(NPE - 1, AckNumAck, ""), "");
         }
 
     }
@@ -374,8 +386,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     protected boolean checkRWS(int NPE, int LPA, int currentSequenceNumber) {
         if (LPA >= NPE) {
             return NPE <= currentSequenceNumber && currentSequenceNumber <= LPA;
-        }
-        else {
+        } else {
             return NPE <= currentSequenceNumber || currentSequenceNumber <= LPA;
         }
     }
@@ -413,11 +424,11 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         System.out.println("\n\n===============STATISTICS=======================");
         System.out.println("Number of original packets transmitted by A:" + numPacket);
         System.out.println("Number of retransmissions by A:" + numRxm);
-        System.out.println("Number of data packets delivered to layer 5 at B:" + "<YourVariableHere>");
-        System.out.println("Number of ACK packets sent by B:" + "<YourVariableHere>");
-        System.out.println("Number of corrupted packets:" + "<YourVariableHere>");
+        System.out.println("Number of data packets delivered to layer 5 at B:" + numOfPacketToLayer5);
+        System.out.println("Number of ACK packets sent by B:" + numOfAckSentToB);
+        System.out.println("Number of corrupted packets:" + numOfCorruptedPackets);
         System.out.println("Ratio of lost packets:" + "<YourVariableHere>");
-        System.out.println("Ratio of corrupted packets:" + "<YourVariableHere>");
+        System.out.println("Ratio of corrupted packets:" + (numOfPacketToLayer5 / numOfPacketsReceivedByBNotLoss));
         System.out.println("Average RTT:" + "<YourVariableHere>");
         System.out.println("Average communication time:" + "<YourVariableHere>");
         System.out.println("==================================================");
