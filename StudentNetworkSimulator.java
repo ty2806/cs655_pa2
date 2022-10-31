@@ -340,6 +340,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         }
 
         if (!checkRWS(NPE, LPA, seqnum)) {
+            toLayer3(B, new Packet(seqnum, AckNumAck, generateChecksum(seqnum, AckNumAck, ""), ""));
             return;
         }
 
