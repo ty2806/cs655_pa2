@@ -157,20 +157,13 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         return diff;
     }
 
-    // Calculate the checksum of a string
-    protected int calculateCheckSum(String data) {
-        int hash = data.hashCode();
-        return hash;
-    }
-
     // check if a given packet has corrupted
     // return false if the packet is corrupted
     // otherwise return true
     protected boolean checkCorruption(Packet p) {
         int checksum = p.getChecksum();
-        String data = p.getSeqnum() + p.getAcknum() + p.getPayload();
 
-        if (checksum == calculateCheckSum(data))
+        if (checksum == generateChecksum(p.getSeqnum(), p.getAcknum(), p.getPayload()))
             return true;
         else return false;
     }
@@ -206,10 +199,17 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         String payload = message.getData();
         int acknum = AckNumData;
 
-        int lastSeqNum = SenderBuffer.get(SenderBuffer.size() - 1).getSeqnum();
-        int seqnum = (lastSeqNum + 1) % LimitSeqNo;
+        int seqnum;
+        if (SenderBuffer.size() > 0) {
+            int lastSeqNum = SenderBuffer.get(SenderBuffer.size() - 1).getSeqnum();
+            seqnum = (lastSeqNum + 1) % LimitSeqNo;
+        }
+        else {
+            seqnum = FirstSeqNo;
+        }
 
-        int checksum = calculateCheckSum(seqnum + acknum + payload);
+
+        int checksum = generateChecksum(seqnum, acknum, payload);
         Packet packet = new Packet(seqnum, acknum, checksum, payload);
         SenderBuffer.add(packet);
 
