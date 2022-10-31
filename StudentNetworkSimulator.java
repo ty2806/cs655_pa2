@@ -267,8 +267,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // sent from the B-side.
     protected void aInput(Packet packet) {
         // check if packet is corrupted
-        System.out.println("ack: " + packet);
-        System.out.println("ack checksum:" + generateChecksum(packet.getSeqnum(), packet.getAcknum(), packet.getPayload()));
         if (!checkCorruption(packet)) {
             numOfCorruptedPackets++;
             return;
@@ -278,10 +276,15 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
         int ack = packet.getAcknum();
         // duplicate ack
-        System.out.println("ack:" + ack + " LAR:" + LAR + " LPS" + LPS);
         if (ack == LAR) {
             if (SenderBuffer.size() == 0) {
                 return;
+            }
+            int realSeq = Integer.parseInt(packet.getPayload());
+            if (sendTimeNoRxm.containsKey(realSeq)) {
+                RTT += getTime() - sendTimeNoRxm.get(realSeq);
+                sendTimeNoRxm.remove(realSeq);
+                numFirstAck++;
             }
             sendTimeNoRxm.remove(SenderBuffer.get(0).getSeqnum());
             aSend(SenderBuffer.get(0));
@@ -309,7 +312,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
             // remove acknowledged packets in buffer
             SenderBuffer.subList(0, diff).clear();
-            System.out.println("diff:" + diff + " buffersize:" + SenderBuffer.size());
             // stop timer when the last sent packet gets ack
             if (SenderBuffer.size() == 0) {
                 stopTimer(A);
