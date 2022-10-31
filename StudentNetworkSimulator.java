@@ -248,6 +248,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         System.out.println("ack: " + packet);
         System.out.println("ack checksum:" + generateChecksum(packet.getSeqnum(), packet.getAcknum(), packet.getPayload()));
         if (!checkCorruption(packet)) {
+            numOfCorruptedPackets++;
             return;
         }
 
@@ -257,6 +258,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         // duplicate ack
         if (ack == LAR) {
             aSend(SenderBuffer.get(0));
+            System.out.println("RETRANSMISSION: duplicate ack:"+ ack + " LAR:" + LAR + " packet:" + packet);
             numRxm += 1;
         }
         // new ack
@@ -299,6 +301,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt() {
         aSend(SenderBuffer.get(0));
+        System.out.println("RETRANSMISSION: timeout:" + " LAR:" + LAR + " packet:" + SenderBuffer.get(0));
         numRxm += 1;
     }
 
@@ -328,6 +331,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // if is NPE, find current cumulative ack, call to layer5() send data update NPE and LPA
     // if out of order, put packet into buffer
     protected void bInput(Packet packet) {
+        System.out.println("start binput");
         numOfPacketsReceivedByBNotLoss++;
         int acknum = packet.getAcknum();
         int seqnum = packet.getSeqnum();
@@ -335,11 +339,13 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         String payload = packet.getPayload();
         // if packet corrupted, drop it.
         if (!checkCorruption(packet)) {
+            System.out.println("corrupt");
             numOfCorruptedPackets++;
             return;
         }
 
         if (!checkRWS(NPE, LPA, seqnum)) {
+            System.out.println("out of range");
             return;
         }
 
@@ -349,11 +355,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             // peek out the first item in the buffer
             // if the first item is NPE, poll the first item, update variable to NPE, update NPE and LPA to NPE+1 and LPA+1, send to layer 5
             // send ack number
+            System.out.println("to layer 5");
             toLayer5(payload);
+            numOfPacketToLayer5++;
             int bAcknum = NPE;
             NPE = updateWindow(NPE, LimitSeqNo);
             LPA = updateWindow(LPA, LimitSeqNo);
             while (!receiverBuffer.isEmpty()) {
+                System.out.println("while loop");
                 Packet next = receiverBuffer.peek();
                 if (next.getSeqnum() == NPE) {
                     toLayer5(next.getPayload());
@@ -363,6 +372,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
                     LPA = updateWindow(LPA, LimitSeqNo);
                     receiverBuffer.poll();
                 }
+                else break;
             }
 
             // what should I send to b for seq, checksum and payload?
@@ -376,8 +386,11 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         // out of order packet received.
         else {
             receiverBuffer.add(packet);
-            new Packet(NPE - 1, AckNumAck, generateChecksum(NPE - 1, AckNumAck, ""), "");
+            System.out.println("out of order ack");
+            toLayer3(B, new Packet(NPE - 1, AckNumAck, generateChecksum(NPE - 1, AckNumAck, ""), ""));
+            numOfAckSentToB++;
         }
+        System.out.println("end binput");
 
     }
 
@@ -403,19 +416,20 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         RWS = WindowSize; // receive window size
         LPA = WindowSize - 1; // last packet acceptable
         NPE = 0; // next packet expected
-        receiverBuffer = new PriorityQueue<>((a, b) -> {
-            int seqNumA = a.getSeqnum();
-            int seqNumB = b.getSeqnum();
-            if (seqNumA < NPE && seqNumB < NPE) {
-                return seqNumA - seqNumB;
-            } else if (seqNumA < NPE) {
-                return seqNumB - seqNumA;
-            } else if (seqNumB < NPE) {
-                return seqNumA - seqNumB;
-            } else {
-                return seqNumA - seqNumB;
-            }
-        });
+        receiverBuffer = new LinkedList<>();
+//        receiverBuffer = new PriorityQueue<>((a, b) -> {
+//            int seqNumA = a.getSeqnum();
+//            int seqNumB = b.getSeqnum();
+//            if (seqNumA < NPE && seqNumB < NPE) {
+//                return seqNumA - seqNumB;
+//            } else if (seqNumA < NPE) {
+//                return seqNumB - seqNumA;
+//            } else if (seqNumB < NPE) {
+//                return seqNumA - seqNumB;
+//            } else {
+//                return seqNumA - seqNumB;
+//            }
+//        });
     }
 
     // Use to print final statistics
