@@ -1,5 +1,4 @@
 import java.util.*;
-import java.io.*;
 
 public class StudentNetworkSimulator extends NetworkSimulator {
     /*
@@ -138,7 +137,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
     private int numOfPacketToLayer5 = 0;
 
-    private int numOfAckSentToB = 0;
+    private int numOfAckSentByB = 0;
 
     private int numOfCorruptedPackets = 0;
 
@@ -257,6 +256,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         int ack = packet.getSeqnum();
         // duplicate ack
         if (ack == LAR) {
+            if (SenderBuffer.size() == 0) {
+                return;
+            }
             aSend(SenderBuffer.get(0));
             numRxm += 1;
         }
@@ -341,6 +343,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         }
 
         if (!checkRWS(NPE, LPA, seqnum)) {
+            toLayer3(B, new Packet(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1 , AckNumAck, generateChecksum(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1 , AckNumAck, ""), ""));
+            numOfAckSentByB ++;
             return;
         }
 
@@ -372,7 +376,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             // I think it doesn't matter?
             Packet ackPacket = new Packet(bAcknum, AckNumAck, generateChecksum(bAcknum, AckNumAck, ""), "");
             toLayer3(B, ackPacket);
-            numOfAckSentToB++;
+            numOfAckSentByB++;
 
 
         }
@@ -380,8 +384,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         else {
             receiverBuffer.add(packet);
             System.out.println("out of order ack");
-            toLayer3(B, new Packet(NPE - 1, AckNumAck, generateChecksum(NPE - 1, AckNumAck, ""), ""));
-            numOfAckSentToB++;
+
+            toLayer3(B, new Packet(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1, AckNumAck, generateChecksum(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1, AckNumAck, ""), ""));
+            numOfAckSentByB++;
         }
 
     }
@@ -431,7 +436,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         System.out.println("Number of original packets transmitted by A:" + numPacket);
         System.out.println("Number of retransmissions by A:" + numRxm);
         System.out.println("Number of data packets delivered to layer 5 at B:" + numOfPacketToLayer5);
-        System.out.println("Number of ACK packets sent by B:" + numOfAckSentToB);
+        System.out.println("Number of ACK packets sent by B:" + numOfAckSentByB);
         System.out.println("Number of corrupted packets:" + numOfCorruptedPackets);
         System.out.println("Ratio of lost packets:" + "<YourVariableHere>");
         System.out.println("Ratio of corrupted packets:" + (numOfPacketToLayer5 / numOfPacketsReceivedByBNotLoss));
