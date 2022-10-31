@@ -143,6 +143,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
     private int numOfPacketsReceivedByBNotLoss = 0;
 
+    private final int SEQNUMBER_FROM_B_TO_A = 123;
+
     // Sender statistic variable
     // number of packets sent
     private int numPacket;
@@ -253,7 +255,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         numPacket += 1;
     }
 
-    // This routine will be called whenever a packet sent from the B-side 
+    // This routine will be called whenever a packet sent from the B-side
     // (i.e. as a result of a toLayer3() being done by a B-side procedure)
     // arrives at the A-side.  "packet" is the (possibly corrupted) packet
     // sent from the B-side.
@@ -349,7 +351,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // sent from the A-side.
     // FSM:
     // if corrupted packet drop it
-    // if not in RWS drop
+    // if not in RWS drop and ack
     // if is NPE, find current cumulative ack, call to layer5() send data update NPE and LPA
     // if out of order, put packet into buffer
     protected void bInput(Packet packet) {
@@ -358,14 +360,17 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         int seqnum = packet.getSeqnum();
         int checksum = packet.getChecksum();
         String payload = packet.getPayload();
+
         // if packet corrupted, drop it.
         if (!checkCorruption(packet)) {
             numOfCorruptedPackets++;
             return;
         }
 
+        // if pacekt is out of range drop and ack
         if (!checkRWS(NPE, LPA, seqnum)) {
-            toLayer3(B, new Packet(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, generateChecksum(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, ""), ""));
+            int bAck = NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1;
+            toLayer3(B, new Packet(SEQNUMBER_FROM_B_TO_A, bAck, generateChecksum(SEQNUMBER_FROM_B_TO_A, bAck, ""), ""));
             numOfAckSentByB++;
             return;
         }
@@ -376,6 +381,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             // peek out the first item in the buffer
             // if the first item is NPE, poll the first item, update variable to NPE, update NPE and LPA to NPE+1 and LPA+1, send to layer 5
             // send ack number
+            String backPayload = seqnum + "";
             toLayer5(payload);
             numOfPacketToLayer5++;
             int bAcknum = NPE;
@@ -393,9 +399,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
                 } else break;
             }
 
-            // what should I send to b for seq, checksum and payload?
-            // I think it doesn't matter?
-            Packet ackPacket = new Packet(bAcknum, AckNumAck, generateChecksum(bAcknum, AckNumAck, ""), "");
+
+            Packet ackPacket = new Packet(SEQNUMBER_FROM_B_TO_A, bAcknum, generateChecksum(SEQNUMBER_FROM_B_TO_A, bAcknum, ""), backPayload);
             toLayer3(B, ackPacket);
             numOfAckSentByB++;
 
@@ -405,8 +410,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         else {
             receiverBuffer.add(packet);
             System.out.println("out of order ack");
-
-            toLayer3(B, new Packet(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, generateChecksum(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, ""), ""));
+            int bAck = NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1;
+            toLayer3(B, new Packet(SEQNUMBER_FROM_B_TO_A, bAck, generateChecksum(SEQNUMBER_FROM_B_TO_A, bAck, ""), packet.getSeqnum() + ""));
             numOfAckSentByB++;
         }
 
@@ -451,6 +456,12 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     }
 
     // Use to print final statistics
+    // Corruption ratio = (corrupted packets) / ( (original packets by A + retransmissions by A) + ACK
+    // packets by B - (retransmissions by A – corrupted packets) )
+
+    // Ratio of lost packets:
+    // Lost ratio = (retransmissions by A – corrupted packets) / ((original packets by A +
+    // retransmissions by A) + ACK packets by B)
     protected void Simulation_done() {
         // TO PRINT THE STATISTICS, FILL IN THE DETAILS BY PUTTING VARIBALE NAMES. DO NOT CHANGE THE FORMAT OF PRINTED OUTPUT
         System.out.println("\n\n===============STATISTICS=======================");
@@ -459,11 +470,10 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         System.out.println("Number of data packets delivered to layer 5 at B:" + numOfPacketToLayer5);
         System.out.println("Number of ACK packets sent by B:" + numOfAckSentByB);
         System.out.println("Number of corrupted packets:" + numOfCorruptedPackets);
-        System.out.println("Ratio of lost packets:" + "<YourVariableHere>");
-        System.out.println("Ratio of corrupted packets:" + (numOfPacketToLayer5 / numOfPacketsReceivedByBNotLoss));
+        System.out.println("Ratio of lost packets:" + (("retransimision by a"-(numOfCorruptedPackets+"corruputed ack"))/("origin packet by a"+"retrans by a" + numOfAckSentByB )));
+        System.out.println("Ratio of corrupted packets:" + ((numOfCorruptedPackets + "enter corrput b to a here") / ("original packet by a"+numOfAckSentByB-(numOfCorruptedPackets + "enter corrput b to a here")));
         System.out.println("Average RTT:" + (numPacket - numRxm) / RTT);
-        System.out.println("Average communication time:" + numPacket / ComTime);
-        System.out.println("==================================================");
+        System.out.println("Average communication time:" + numPacket / ComTime);        System.out.println("==================================================");
 
         // PRINT YOUR OWN STATISTIC HERE TO CHECK THE CORRECTNESS OF YOUR PROGRAM
         System.out.println("\nEXTRA:");
