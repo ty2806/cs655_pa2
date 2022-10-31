@@ -153,6 +153,15 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // number of ack received
     private int numAck;
 
+    // record the sending time of packets
+    private HashMap<Integer, Double> sendTime;
+
+    // total RTT
+    private int RTT;
+
+    // total communication time
+    private int ComTime;
+
     // This is the constructor.  Don't touch!
     public StudentNetworkSimulator(int numMessages,
                                    double loss,
@@ -222,20 +231,26 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         Packet packet = new Packet(seqnum, acknum, checksum, payload);
         SenderBuffer.add(packet);
 
-        System.out.println("LAR:" + LAR + " LPS:" + LPS);
         if (calculateDiff(LAR, LPS) < SWS) {
-            aSend(packet);
-            System.out.println(packet);
-            LPS = (LPS + 1) % LimitSeqNo;
-            numPacket += 1;
+            aFirstSend(packet);
         }
     }
 
+    // send a pcket to layer 3 and restart timer
     protected void aSend(Packet p) {
         // restart timer every time a packet is pushed to layer 3
         stopTimer(A);
         toLayer3(A, p);
         startTimer(A, RxmtInterval);
+    }
+
+    // send a pcket to layer 3 for the first time
+    // increment LPS and statistic parameters
+    protected void aFirstSend(Packet p) {
+        aSend(p);
+        sendTime.put(p.getSeqnum(), getTime());
+        LPS = (LPS + 1) % LimitSeqNo;
+        numPacket += 1;
     }
 
     // This routine will be called whenever a packet sent from the B-side 
@@ -253,7 +268,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
         numAck += 1;
 
-        int ack = packet.getSeqnum();
+        int ack = packet.getAcknum();
         // duplicate ack
         if (ack == LAR) {
             if (SenderBuffer.size() == 0) {
@@ -265,6 +280,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         // new ack
         else {
             int diff = calculateDiff(LAR, ack);
+
+            RTT += getTime() - sendTime.get(ack);
+            for (int i = 1; i <= diff; i++) {
+                ComTime += getTime() - sendTime.get((LAR + i) % LimitSeqNo);
+                sendTime.remove((LAR + i) % LimitSeqNo);
+            }
+
+
             // update LAR
             LAR = ack;
 
@@ -288,9 +311,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
             // send new packets starting from LPS+1
             for (int i = LPSindex + 1; i < Math.min(SenderBuffer.size(), LPSindex + diff + 1); i++) {
-                aSend(SenderBuffer.get(i));
-                LPS = (LPS + 1) % LimitSeqNo;
-                numPacket += 1;
+                aFirstSend(SenderBuffer.get(i));
             }
 
         }
@@ -319,6 +340,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         numPacket = 0;
         numRxm = 0;
         numAck = 0;
+        sendTime = new HashMap<>();
     }
 
     // This routine will be called whenever a packet sent from the B-side
@@ -343,8 +365,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         }
 
         if (!checkRWS(NPE, LPA, seqnum)) {
-            toLayer3(B, new Packet(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1 , AckNumAck, generateChecksum(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1 , AckNumAck, ""), ""));
-            numOfAckSentByB ++;
+            toLayer3(B, new Packet(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, generateChecksum(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, ""), ""));
+            numOfAckSentByB++;
             return;
         }
 
@@ -368,8 +390,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
                     NPE = updateWindow(NPE, LimitSeqNo);
                     LPA = updateWindow(LPA, LimitSeqNo);
                     receiverBuffer.poll();
-                }
-                else break;
+                } else break;
             }
 
             // what should I send to b for seq, checksum and payload?
@@ -385,7 +406,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             receiverBuffer.add(packet);
             System.out.println("out of order ack");
 
-            toLayer3(B, new Packet(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1, AckNumAck, generateChecksum(NPE - 1<0?LimitSeqNo+(NPE-1):NPE-1, AckNumAck, ""), ""));
+            toLayer3(B, new Packet(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, generateChecksum(NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1, AckNumAck, ""), ""));
             numOfAckSentByB++;
         }
 
@@ -440,8 +461,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         System.out.println("Number of corrupted packets:" + numOfCorruptedPackets);
         System.out.println("Ratio of lost packets:" + "<YourVariableHere>");
         System.out.println("Ratio of corrupted packets:" + (numOfPacketToLayer5 / numOfPacketsReceivedByBNotLoss));
-        System.out.println("Average RTT:" + "<YourVariableHere>");
-        System.out.println("Average communication time:" + "<YourVariableHere>");
+        System.out.println("Average RTT:" + (numPacket - numRxm) / RTT);
+        System.out.println("Average communication time:" + numPacket / ComTime);
         System.out.println("==================================================");
 
         // PRINT YOUR OWN STATISTIC HERE TO CHECK THE CORRECTNESS OF YOUR PROGRAM
