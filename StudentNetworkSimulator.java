@@ -114,6 +114,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // Last packet sent
     private int LPS;
 
+    // Last packet received from layer 5
+    private int LPR;
+
     // Sender buffer
     private ArrayList<Packet> SenderBuffer;
 
@@ -133,6 +136,16 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // Receiver buffer
     private Queue<Packet> receiverBuffer;
 
+    // Sender statistic variable
+    // number of packets sent
+    private int numPacket;
+
+    // number of retransmission
+    private int numRxm;
+
+    // number of ack received
+    private int numAck;
+
     // This is the constructor.  Don't touch!
     public StudentNetworkSimulator(int numMessages,
                                    double loss,
@@ -150,7 +163,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
     // Calculate the difference of 2 number module sequence number
     protected int calculateDiff(int low, int high) {
-        int diff = low - high;
+        int diff = high - low;
         if (diff < 0) {
             diff += LimitSeqNo;
         }
@@ -161,11 +174,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // return false if the packet is corrupted
     // otherwise return true
     protected boolean checkCorruption(Packet p) {
-        int checksum = p.getChecksum();
-
-        if (checksum == generateChecksum(p.getSeqnum(), p.getAcknum(), p.getPayload()))
-            return true;
-        else return false;
+        return p.getChecksum() == generateChecksum(p.getSeqnum(), p.getAcknum(), p.getPayload());
     }
 
     // possible alternative for checksum in checkCorruption method
@@ -199,23 +208,19 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         String payload = message.getData();
         int acknum = AckNumData;
 
-        int seqnum;
-        if (SenderBuffer.size() > 0) {
-            int lastSeqNum = SenderBuffer.get(SenderBuffer.size() - 1).getSeqnum();
-            seqnum = (lastSeqNum + 1) % LimitSeqNo;
-        }
-        else {
-            seqnum = FirstSeqNo;
-        }
-
+        int seqnum = LPR;
+        LPR = (LPR + 1) % LimitSeqNo;
 
         int checksum = generateChecksum(seqnum, acknum, payload);
         Packet packet = new Packet(seqnum, acknum, checksum, payload);
         SenderBuffer.add(packet);
 
+        System.out.println("LAR:" + LAR + " LPS:" + LPS);
         if (calculateDiff(LAR, LPS) < SWS) {
             aSend(packet);
+            System.out.println(packet);
             LPS = (LPS + 1) % LimitSeqNo;
+            numPacket += 1;
         }
     }
 
@@ -232,14 +237,19 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // sent from the B-side.
     protected void aInput(Packet packet) {
         // check if packet is corrupted
-        if (checkCorruption(packet)) {
+        System.out.println("ack: " + packet);
+        System.out.println("ack checksum:"+generateChecksum(packet.getSeqnum(), packet.getAcknum(), packet.getPayload()));
+        if (!checkCorruption(packet)) {
             return;
         }
+
+        numAck += 1;
 
         int ack = packet.getSeqnum();
         // duplicate ack
         if (ack == LAR) {
             aSend(SenderBuffer.get(0));
+            numRxm += 1;
         }
         // new ack
         else {
@@ -248,8 +258,12 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             LAR = ack;
 
             // remove acknowledged packets in buffer
-            for (int i = 0; i < diff; i++) {
-                SenderBuffer.remove(0);
+            SenderBuffer.subList(0, diff).clear();
+
+            // stop timer when the last sent packet gets ack
+            if (SenderBuffer.size() == 0) {
+                stopTimer(A);
+                return;
             }
 
             // get the buffer index of LPS packet
@@ -265,6 +279,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             for (int i = LPSindex + 1; i < Math.min(SenderBuffer.size(), LPSindex + diff + 1); i++) {
                 aSend(SenderBuffer.get(i));
                 LPS = (LPS + 1) % LimitSeqNo;
+                numPacket += 1;
             }
 
         }
@@ -274,8 +289,10 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // timer interrupt). You'll probably want to use this routine to control 
     // the retransmission of packets. See startTimer() and stopTimer(), above,
     // for how the timer is started and stopped. 
-    protected void aTimerInterrupt() {
+    protected void aTimerInterrupt()
+    {
         aSend(SenderBuffer.get(0));
+        numRxm += 1;
     }
 
     // This routine will be called once, before any of your other A-side
@@ -286,7 +303,12 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         SWS = WindowSize;
         LAR = -1;
         LPS = -1;
+        LPR = FirstSeqNo;
         SenderBuffer = new ArrayList<>();
+
+        numPacket = 0;
+        numRxm = 0;
+        numAck = 0;
     }
 
     // This routine will be called whenever a packet sent from the B-side
@@ -320,15 +342,15 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             // send ack number
             toLayer5(payload);
             int bAcknum = NPE;
-            NPE = updateWindow(NPE, RWS);
-            LPA = updateWindow(LPA, RWS);
+            NPE = updateWindow(NPE, LimitSeqNo);
+            LPA = updateWindow(LPA, LimitSeqNo);
             while (!receiverBuffer.isEmpty()) {
                 Packet next = receiverBuffer.peek();
                 if (next.getSeqnum() == NPE) {
                     toLayer5(next.getPayload());
                     bAcknum = NPE;
-                    NPE = updateWindow(NPE, RWS);
-                    LPA = updateWindow(LPA, RWS);
+                    NPE = updateWindow(NPE, LimitSeqNo);
+                    LPA = updateWindow(LPA, LimitSeqNo);
                     receiverBuffer.poll();
                 }
             }
@@ -350,7 +372,12 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // check if current packet seqnumber is in the window
     // return true if it is in the window and false if it is not
     protected boolean checkRWS(int NPE, int LPA, int currentSequenceNumber) {
-        return NPE <= currentSequenceNumber && currentSequenceNumber <= LPA ? true : false;
+        if (LPA >= NPE) {
+            return NPE <= currentSequenceNumber && currentSequenceNumber <= LPA;
+        }
+        else {
+            return NPE <= currentSequenceNumber || currentSequenceNumber <= LPA;
+        }
     }
 
     protected int updateWindow(int NPEorLPA, int windowSize) {
@@ -384,8 +411,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     protected void Simulation_done() {
         // TO PRINT THE STATISTICS, FILL IN THE DETAILS BY PUTTING VARIBALE NAMES. DO NOT CHANGE THE FORMAT OF PRINTED OUTPUT
         System.out.println("\n\n===============STATISTICS=======================");
-        System.out.println("Number of original packets transmitted by A:" + "<YourVariableHere>");
-        System.out.println("Number of retransmissions by A:" + "<YourVariableHere>");
+        System.out.println("Number of original packets transmitted by A:" + numPacket);
+        System.out.println("Number of retransmissions by A:" + numRxm);
         System.out.println("Number of data packets delivered to layer 5 at B:" + "<YourVariableHere>");
         System.out.println("Number of ACK packets sent by B:" + "<YourVariableHere>");
         System.out.println("Number of corrupted packets:" + "<YourVariableHere>");
@@ -398,7 +425,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         // PRINT YOUR OWN STATISTIC HERE TO CHECK THE CORRECTNESS OF YOUR PROGRAM
         System.out.println("\nEXTRA:");
         // EXAMPLE GIVEN BELOW
-        //System.out.println("Example statistic you want to check e.g. number of ACK packets received by A :" + "<YourVariableHere>");
+        System.out.println("Number of ACK packets received by A :" + numAck);
     }
 
 }
