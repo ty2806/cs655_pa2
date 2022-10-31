@@ -335,7 +335,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
             // what should I send to b for seq, checksum and payload?
             // I think it doesn't matter?
-            Packet ackPacket = new Packet(0, bAcknum, generateChecksum(0, bAcknum, ""), "");
+            Packet ackPacket = new Packet(bAcknum, AckNumAck, generateChecksum(bAcknum, AckNumAck, ""), "");
             toLayer3(B, ackPacket);
 
 
