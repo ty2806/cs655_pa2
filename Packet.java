@@ -5,42 +5,60 @@ public class Packet {
     private int acknum;
     private int checksum;
     private String payload;
-    
-    public Packet(Packet p)
-    {
+    private int[] sacks;
+
+    public int[] getSacks() {
+        return sacks;
+    }
+
+    public void setSacks(int[] sacks) {
+        this.sacks = sacks;
+    }
+
+    public Packet(Packet p) {
         seqnum = p.getSeqnum();
         acknum = p.getAcknum();
         checksum = p.getChecksum();
         payload = new String(p.getPayload());
+        sacks = p.getSacks();
     }
-    
-    public Packet(int seq, int ack, int check, String newPayload)
-    {
+
+    public Packet(int seq, int ack, int check, String newPayload) {
         seqnum = seq;
         acknum = ack;
         checksum = check;
-        if (newPayload == null)
-        {
+        this.sacks = new int[5];
+        Arrays.fill(this.sacks, -1);
+        if (newPayload == null) {
             payload = "";
-        }        
-        else if (newPayload.length() > NetworkSimulator.MAXDATASIZE)
-        {
+        } else if (newPayload.length() > NetworkSimulator.MAXDATASIZE) {
             payload = null;
-        }
-        else
-        {
+        } else {
             payload = new String(newPayload);
         }
     }
-    
-    public Packet(int seq, int ack, int check)
-    {
+
+    public Packet(int seq, int ack, int check, String newPayload, int[] sacks) {
+        this(seq, ack, check, newPayload);
+        this.sacks = sacks;
+    }
+
+
+    public Packet(int seq, int ack, int check) {
         seqnum = seq;
         acknum = ack;
         checksum = check;
         payload = "";
-    }    
-        
+        sacks = new int[5];
+        Arrays.fill(this.sacks, -1);
+
+    }
+
+    public Packet(int seq, int ack, int check, int[] sacks) {
+        this(seq, ack, check);
+        this.sacks = sacks;
+    }
+
 
     public boolean setSeqnum(int n) {
         seqnum = n;
