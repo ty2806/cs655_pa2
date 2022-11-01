@@ -381,8 +381,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // of entity A).
     protected void aInit() {
         SWS = WindowSize;
-        LAR = -1;
-        LPS = -1;
+        LAR = LimitSeqNo - 1;
+        LPS = LimitSeqNo - 1;
         LPR = FirstSeqNo;
         SenderBuffer = new ArrayList<>();
 
