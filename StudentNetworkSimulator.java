@@ -268,6 +268,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     protected void aInput(Packet packet) {
         // check if packet is corrupted
         if (!checkCorruption(packet)) {
+            System.out.println("A received a corrupted packet from B");
             numOfCorruptedPackets++;
             return;
         }
@@ -277,6 +278,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         int ack = packet.getAcknum();
         // duplicate ack
         if (ack == LAR) {
+            System.out.println("A received a duplicate ack from B. Ack number:" + ack);
             if (SenderBuffer.size() == 0) {
                 return;
             }
@@ -292,6 +294,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         }
         // new ack
         else {
+            System.out.println("A received a new ack from B. Ack number:" + ack);
             int diff = calculateDiff(LAR, ack);
 
             if (diff == 1 && sendTimeNoRxm.containsKey(ack)) {
@@ -382,12 +385,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
         // if packet corrupted, drop it.
         if (!checkCorruption(packet)) {
+            System.out.println("B received a corrupted packet from A");
             numOfCorruptedPackets++;
             return;
         }
 
         // if pacekt is out of range drop and ack
         if (!checkRWS(NPE, LPA, seqnum)) {
+            System.out.println("B received a duplicate packet from A. seq number:" + seqnum);
             int bAck = NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1;
             toLayer3(B, new Packet(SEQNUMBER_FROM_B_TO_A, bAck, generateChecksum(SEQNUMBER_FROM_B_TO_A, bAck, ""), ""));
             numOfAckSentByB++;
@@ -400,6 +405,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             // peek out the first item in the buffer
             // if the first item is NPE, poll the first item, update variable to NPE, update NPE and LPA to NPE+1 and LPA+1, send to layer 5
             // send ack number
+            System.out.println("B received a new packet from A. seq number:" + seqnum);
             String backPayload = seqnum + "";
             toLayer5(payload);
             numOfPacketToLayer5++;
@@ -427,8 +433,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         }
         // out of order packet received.
         else {
+            System.out.println("B received an out of order packet from A. seq number:" + seqnum);
             receiverBuffer.add(packet);
-            System.out.println("out of order ack");
             int bAck = NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1;
             toLayer3(B, new Packet(SEQNUMBER_FROM_B_TO_A, bAck, generateChecksum(SEQNUMBER_FROM_B_TO_A, bAck, packet.getSeqnum() + ""), packet.getSeqnum() + ""));
             numOfAckSentByB++;
