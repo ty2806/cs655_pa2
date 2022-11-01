@@ -234,8 +234,10 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         int seqnum = LPR;
         LPR = (LPR + 1) % LimitSeqNo;
 
-        int checksum = generateChecksum(seqnum, acknum, payload);
-        Packet packet = new Packet(seqnum, acknum, checksum, payload);
+        int[] sack = new int[5];
+
+        int checksum = generateChecksum(seqnum, acknum, payload, sack);
+        Packet packet = new Packet(seqnum, acknum, checksum, payload, sack);
         SenderBuffer.add(packet);
 
         if (calculateDiff(LAR, LPS) < SWS) {
@@ -282,15 +284,32 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             if (SenderBuffer.size() == 0) {
                 return;
             }
-            int realSeq = Integer.parseInt(packet.getPayload());
-            if (sendTimeNoRxm.containsKey(realSeq)) {
-                RTT += getTime() - sendTimeNoRxm.get(realSeq);
-                sendTimeNoRxm.remove(realSeq);
-                numFirstAck++;
+
+            // use hashset to store sack values
+            HashSet<Integer> acked = new HashSet<>();
+
+            // count RTT for packets in sack
+            for (int sack_seqnum : packet.getSacks()) {
+                if (sendTimeNoRxm.containsKey(sack_seqnum)) {
+                    RTT += getTime() - sendTimeNoRxm.get(sack_seqnum);
+                    sendTimeNoRxm.remove(sack_seqnum);
+                    numFirstAck++;
+                }
+                if (sack_seqnum >= 0) {
+                    acked.add(sack_seqnum);
+                }
             }
+            // remove first packet for no retransmission RTT counting since it is already lost
             sendTimeNoRxm.remove(SenderBuffer.get(0).getSeqnum());
-            aSend(SenderBuffer.get(0));
-            numRxm += 1;
+
+            System.out.println("acked:" + acked + " LAR:" + LAR + " LPS:" + LPS);
+            // loop through send window and send all unacked packets
+            for (int i = 0; i < calculateDiff(LAR, LPS); i++) {
+                if (!acked.contains(SenderBuffer.get(i).getSeqnum())) {
+                    aSend(SenderBuffer.get(i));
+                    numRxm += 1;
+                }
+            }
         }
         // new ack
         else {
@@ -343,9 +362,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // the retransmission of packets. See startTimer() and stopTimer(), above,
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt() {
-        aSend(SenderBuffer.get(0));
-        sendTimeNoRxm.remove(SenderBuffer.get(0).getSeqnum());
-        numRxm += 1;
+        for (Packet packet : SenderBuffer) {
+            aSend(packet);
+            sendTimeNoRxm.remove(packet.getSeqnum());
+            numRxm += 1;
+            if (packet.getSeqnum() == LPS) {
+                break;
+            }
+        }
     }
 
     // This routine will be called once, before any of your other A-side

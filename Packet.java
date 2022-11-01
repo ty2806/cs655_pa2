@@ -1,5 +1,6 @@
-public class Packet
-{
+import java.util.Arrays;
+
+public class Packet {
     private int seqnum;
     private int acknum;
     private int checksum;
@@ -41,67 +42,53 @@ public class Packet
     }    
         
 
-    public boolean setSeqnum(int n)
-    {
+    public boolean setSeqnum(int n) {
         seqnum = n;
         return true;
     }
-    
-    public boolean setAcknum(int n)
-    {
+
+    public boolean setAcknum(int n) {
         acknum = n;
         return true;
     }
-    
-    public boolean setChecksum(int n)
-    {
+
+    public boolean setChecksum(int n) {
         checksum = n;
         return true;
     }
-    
-    public boolean setPayload(String newPayload)
-    {
-        if (newPayload == null)
-        {
+
+    public boolean setPayload(String newPayload) {
+        if (newPayload == null) {
             payload = "";
             return false;
-        }        
-        else if (newPayload.length() > NetworkSimulator.MAXDATASIZE)
-        {
+        } else if (newPayload.length() > NetworkSimulator.MAXDATASIZE) {
             payload = "";
             return false;
-        }
-        else
-        {
+        } else {
             payload = new String(newPayload);
             return true;
         }
     }
-    
-    public int getSeqnum()
-    {
+
+    public int getSeqnum() {
         return seqnum;
     }
-    
-    public int getAcknum()
-    {
+
+    public int getAcknum() {
         return acknum;
     }
-    
-    public int getChecksum()
-    {
+
+    public int getChecksum() {
         return checksum;
     }
-    
-    public String getPayload()
-    {
+
+    public String getPayload() {
         return payload;
     }
-    
-    public String toString()
-    {
-        return("seqnum: " + seqnum + "  acknum: " + acknum + "  checksum: " +
-               checksum + "  payload: " + payload);
+
+    public String toString() {
+        return ("seqnum: " + seqnum + "  acknum: " + acknum + "  checksum: " +
+                checksum + "  payload: " + payload + " sacks: " + Arrays.toString(this.sacks));
     }
-    
+
 }
