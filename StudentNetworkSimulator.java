@@ -472,7 +472,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
                 } else if (seqNumA < NPE) {
                     return seqNumB - seqNumA;
                 } else if (seqNumB < NPE) {
-                    return seqNumA - seqNumB;
+                    return seqNumB - seqNumA;
                 } else {
                     return seqNumA - seqNumB;
                 }
