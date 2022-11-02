@@ -464,6 +464,19 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         else {
             System.out.println("B received an out of order packet from A. seq number:" + seqnum);
             insertSackPacketIntoQueue(packet);
+            Collections.sort((List<Packet>) receiverBuffer, (a, b) -> {
+                int seqNumA = a.getSeqnum();
+                int seqNumB = b.getSeqnum();
+                if (seqNumA < NPE && seqNumB < NPE) {
+                    return seqNumA - seqNumB;
+                } else if (seqNumA < NPE) {
+                    return seqNumB - seqNumA;
+                } else if (seqNumB < NPE) {
+                    return seqNumA - seqNumB;
+                } else {
+                    return seqNumA - seqNumB;
+                }
+            });
             int bAck = NPE - 1 < 0 ? LimitSeqNo + (NPE - 1) : NPE - 1;
             sacks = generateSacks();
             toLayer3(B, new Packet(SEQNUMBER_FROM_B_TO_A, bAck, generateChecksum(SEQNUMBER_FROM_B_TO_A, bAck, packet.getSeqnum() + "", sacks), packet.getSeqnum() + "", sacks));
@@ -518,20 +531,20 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         RWS = WindowSize; // receive window size
         LPA = WindowSize - 1; // last packet acceptable
         NPE = 0; // next packet expected
-//        receiverBuffer = new LinkedList<>();
-        receiverBuffer = new PriorityQueue<>((a, b) -> {
-            int seqNumA = a.getSeqnum();
-            int seqNumB = b.getSeqnum();
-            if (seqNumA < NPE && seqNumB < NPE) {
-                return seqNumA - seqNumB;
-            } else if (seqNumA < NPE) {
-                return seqNumB - seqNumA;
-            } else if (seqNumB < NPE) {
-                return seqNumA - seqNumB;
-            } else {
-                return seqNumA - seqNumB;
-            }
-        });
+        receiverBuffer = new LinkedList<>();
+//        receiverBuffer = new PriorityQueue<>((a, b) -> {
+//            int seqNumA = a.getSeqnum();
+//            int seqNumB = b.getSeqnum();
+//            if (seqNumA < NPE && seqNumB < NPE) {
+//                return seqNumA - seqNumB;
+//            } else if (seqNumA < NPE) {
+//                return seqNumB - seqNumA;
+//            } else if (seqNumB < NPE) {
+//                return seqNumA - seqNumB;
+//            } else {
+//                return seqNumA - seqNumB;
+//            }
+//        });
     }
 
     // Use to print final statistics
